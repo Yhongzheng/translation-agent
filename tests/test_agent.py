@@ -7,12 +7,12 @@ import pytest
 from dotenv import load_dotenv
 
 # from translation_agent.utils import find_sentence_starts
-from translation_agent.utils import get_completion
-from translation_agent.utils import num_tokens_in_string
-from translation_agent.utils import one_chunk_improve_translation
-from translation_agent.utils import one_chunk_initial_translation
-from translation_agent.utils import one_chunk_reflect_on_translation
-from translation_agent.utils import one_chunk_translate_text
+from translation_agent.utils_cn import get_completion
+from translation_agent.utils_cn import num_tokens_in_string
+from translation_agent.utils_cn import one_chunk_improve_translation
+from translation_agent.utils_cn import one_chunk_initial_translation
+from translation_agent.utils_cn import one_chunk_reflect_on_translation
+from translation_agent.utils_cn import one_chunk_translate_text
 
 
 load_dotenv()

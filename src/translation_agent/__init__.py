@@ -1,1 +1,1 @@
-from .utils import translate
+from .utils_qianfan import translate

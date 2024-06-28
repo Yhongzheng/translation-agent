@@ -9,11 +9,11 @@ from icecream import ic
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 
-load_dotenv()  # read local .env file
-client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# load_dotenv()  # read local .env file
+# client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 MAX_TOKENS_PER_CHUNK = (
-    1000  # if text is more than this many tokens, we'll break it up into
+    2000  # if text is more than this many tokens, we'll break it up into
 )
 # discrete chunks to translate one chunk at a time
 
@@ -21,8 +21,8 @@ MAX_TOKENS_PER_CHUNK = (
 def get_completion(
     prompt: str,
     system_message: str = "You are a helpful assistant.",
-    model: str = "gpt-4-turbo",
-    temperature: float = 0.3,
+    model: str = "gpt-4o",
+    temperature: float = 0.1,
     json_mode: bool = False,
 ) -> Union[str, dict]:
     """
