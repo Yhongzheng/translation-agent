@@ -6,4 +6,5 @@ poetry.lock
 floresp-v2.0-rc.3
 *cache
 wmt
-"path/to/your/secret/file" 
+"path/to/your/secret/file"
+.env.qianfan
