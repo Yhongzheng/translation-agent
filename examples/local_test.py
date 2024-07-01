@@ -6,7 +6,7 @@ import translation_agent as ta
 if __name__ == "__main__":
     source_lang, target_lang, country = "English", "Chinese", "China"
 
-    relative_path = r"C:\Users\yongjie.yang\Desktop\AI Leader Reveals The Future of AI AGENTS (LangChain CEO).cn.txt"
+    relative_path = r"C:\Users\yongjie.yang\Desktop\ceshi.txt"
     script_dir = os.path.dirname(os.path.abspath(__file__))
 
     full_path = os.path.join(script_dir, relative_path)
