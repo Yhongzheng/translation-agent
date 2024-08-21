@@ -49,7 +49,7 @@ def get_completion(
     """
 
     client = OpenAI(
-        api_key="sk-f195c9ec955949dc949e1c286530f63a",  # 如果您没有配置环境变量，请在此处用您的API Key进行替换
+        api_key="sk-7198c4e695b142d886ace00e0af148a7",  # 如果您没有配置环境变量，请在此处用您的API Key进行替换
         base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",  # 填写DashScope SDK的base_url
     )
     completion = client.chat.completions.create(

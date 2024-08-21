@@ -7,6 +7,7 @@ import tiktoken
 from dotenv import load_dotenv
 from icecream import ic
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from util_llm import client_qwen
 
 # load_dotenv()  # 读取本地 .env 文件
 # client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -45,54 +46,34 @@ def get_completion(
             如果 json_mode 为 True，返回完整的 API 响应字典。
             如果 json_mode 为 False，返回生成的文本字符串。
     """
-
-    if json_mode:
-        response = client.chat.completions.create(
-            model=model,
-            temperature=temperature,
-            top_p=1,
-            response_format={"type": "json_object"},
-            messages=[
-                {"role": "system", "content": system_message},
-                {"role": "user", "content": prompt},
-            ],
-        )
-        return response.choices[0].message.content
-    else:
-        response = client.chat.completions.create(
-            model=model,
-            temperature=temperature,
-            top_p=1,
-            messages=[
-                {"role": "system", "content": system_message},
-                {"role": "user", "content": prompt},
-            ],
-        )
-        return response.choices[0].message.content
+    response, _ = client_qwen(system_message, user_message=prompt)
+    return response
 
 
 def one_chunk_initial_translation(
         source_lang: str, target_lang: str, source_text: str
 ) -> str:
     """
-    使用大型语言模型将整段文本进行翻译。
+    使用大型语言模型将整段字幕文本进行翻译。
 
     参数:
         source_lang (str): 源语言的代码。
         target_lang (str): 目标语言的代码。
-        source_text (str): 要翻译的文本。
+        source_text (str): 要翻译的字幕文本。
 
     返回值:
-        str: 翻译后的文本。
+        str: 翻译后的字幕文本。
     """
 
-    system_message = f"您是一名翻译专家，专门从事从 {source_lang} 到 {target_lang} 的翻译。"
+    system_message = f"您是一名翻译专家，专门从事从 {source_lang} 到 {target_lang} 的字幕翻译。"
 
-    translation_prompt = f"""这是一个从 {source_lang} 到 {target_lang} 的翻译请求，请提供该文本的 {target_lang} 译文。
-    请不要提供任何解释或除翻译外的文本。
-{source_lang}: {source_text}
+    translation_prompt = f"""这是一个从 {source_lang} 到 {target_lang} 的字幕翻译请求，请提供该字幕文本的 {target_lang} 译文。
+    请不要提供任何解释或除翻译外的文本。字幕文本中包含时间戳和序号，请保留时间戳和序号原样，只翻译每个字幕文本。
 
-{target_lang}:"""
+{source_lang} 字幕文本:
+{source_text}
+
+{target_lang} 字幕文本:"""
 
     prompt = translation_prompt.format(source_text=source_text)
 
@@ -109,27 +90,27 @@ def one_chunk_reflect_on_translation(
         country: str = "",
 ) -> str:
     """
-    使用大型语言模型对翻译进行反思，将整段文本作为一个整体处理。
+    使用大型语言模型对字幕翻译进行反思，将整段字幕文本作为一个整体处理。
 
     参数:
-        source_lang (str): 源文本的语言代码。
-        target_lang (str): 翻译文本的目标语言代码。
-        source_text (str): 源文本的原始内容。
-        translation_1 (str): 源文本的初次翻译。
+        source_lang (str): 源字幕文本的语言代码。
+        target_lang (str): 翻译字幕文本的目标语言代码。
+        source_text (str): 源字幕文本的原始内容。
+        translation_1 (str): 源字幕文本的初次翻译。
         country (str): 目标语言对应的国家。
 
     返回值:
         str: 大型语言模型对翻译的反思，提供建设性的批评和改进建议。
     """
 
-    system_message = f"""您是一名翻译专家，专门从事从 {source_lang} 到 {target_lang} 的翻译。
-    您将收到一个源文本及其翻译，您的目标是改进这段翻译。"""
+    system_message = f"""您是一名翻译专家，专门从事从 {source_lang} 到 {target_lang} 的字幕翻译。
+    您将收到一个源字幕文本及其翻译，您的目标是改进这段翻译。"""
 
     if country != "":
-        reflection_prompt = f"""您的任务是仔细阅读从 {source_lang} 到 {target_lang} 的源文本和翻译，然后提供建设性的批评和有帮助的改进建议。\
+        reflection_prompt = f"""您的任务是仔细阅读从 {source_lang} 到 {target_lang} 的源字幕文本和翻译，然后提供建设性的批评和有帮助的改进建议。\
     翻译的最终风格和语气应与在 {country} 口语中使用的 {target_lang} 风格相匹配。
 
-    源文本和初次翻译如下，以 XML 标签 <SOURCE_TEXT></SOURCE_TEXT> 和 <TRANSLATION></TRANSLATION> 分隔：
+    源字幕文本和初次翻译如下，以 XML 标签 <SOURCE_TEXT></SOURCE_TEXT> 和 <TRANSLATION></TRANSLATION> 分隔：
 
     <SOURCE_TEXT>
     {source_text}
@@ -142,17 +123,17 @@ def one_chunk_reflect_on_translation(
     在编写建议时，请注意是否有改进翻译的方法：
     (i) 准确性（通过纠正添加、误译、遗漏或未翻译的错误），
     (ii) 流畅性（通过应用 {target_lang} 语法、拼写和标点符号规则，确保没有不必要的重复），
-    (iii) 风格（确保翻译反映源文本的风格，并考虑任何文化背景），
-    (iv) 术语（确保术语使用一致并反映源文本领域；仅确保使用 {target_lang} 中的等效习语）。
+    (iii) 风格（确保翻译反映源字幕文本的风格，并考虑任何文化背景），
+    (iv) 术语（确保术语使用一致并反映源字幕文本领域；仅确保使用 {target_lang} 中的等效习语）。
 
     写出一份具体、有帮助和建设性的改进翻译建议的清单。
     每条建议应针对翻译的一个具体部分。
     只输出建议，不要输出其他内容。"""
 
     else:
-        reflection_prompt = f"""您的任务是仔细阅读从 {source_lang} 到 {target_lang} 的源文本和翻译，然后提供建设性的批评和有帮助的改进建议。
+        reflection_prompt = f"""您的任务是仔细阅读从 {source_lang} 到 {target_lang} 的源字幕文本和翻译，然后提供建设性的批评和有帮助的改进建议。
 
-    源文本和初次翻译如下，以 XML 标签 <SOURCE_TEXT></SOURCE_TEXT> 和 <TRANSLATION></TRANSLATION> 分隔：
+    源字幕文本和初次翻译如下，以 XML 标签 <SOURCE_TEXT></SOURCE_TEXT> 和 <TRANSLATION></TRANSLATION> 分隔：
 
     <SOURCE_TEXT>
     {source_text}
@@ -165,8 +146,8 @@ def one_chunk_reflect_on_translation(
     在编写建议时，请注意是否有改进翻译的方法：
     (i) 准确性（通过纠正添加、误译、遗漏或未翻译的错误），
     (ii) 流畅性（通过应用 {target_lang} 语法、拼写和标点符号规则，确保没有不必要的重复），
-    (iii) 风格（确保翻译反映源文本的风格，并考虑任何文化背景），
-    (iv) 术语（确保术语使用一致并反映源文本领域；仅确保使用 {target_lang} 中的等效习语）。
+    (iii) 风格（确保翻译反映源字幕文本的风格，并考虑任何文化背景），
+    (iv) 术语（确保术语使用一致并反映源字幕文本领域；仅确保使用 {target_lang} 中的等效习语）。
 
     写出一份具体、有帮助和建设性的改进翻译建议的清单。
     每条建议应针对翻译的一个具体部分。
@@ -190,24 +171,24 @@ def one_chunk_improve_translation(
         reflection: str,
 ) -> str:
     """
-    根据反思改进翻译，将整段文本作为一个整体处理。
+    根据反思改进字幕翻译，将整段字幕文本作为一个整体处理。
 
     参数:
-        source_lang (str): 源文本的语言代码。
-        target_lang (str): 翻译文本的目标语言代码。
-        source_text (str): 源文本的原始内容。
-        translation_1 (str): 源文本的初次翻译。
+        source_lang (str): 源字幕文本的语言代码。
+        target_lang (str): 翻译字幕文本的目标语言代码。
+        source_text (str): 源字幕文本的原始内容。
+        translation_1 (str): 源字幕文本的初次翻译。
         reflection (str): 改进翻译的专家建议和建设性批评。
 
     返回值:
         str: 基于专家建议改进后的翻译。
     """
 
-    system_message = f"您是一名翻译编辑专家，专门从事从 {source_lang} 到 {target_lang} 的翻译编辑。"
+    system_message = f"您是一名翻译编辑专家，专门从事从 {source_lang} 到 {target_lang} 的字幕翻译编辑。"
 
-    prompt = f"""您的任务是仔细阅读并编辑从 {source_lang} 到 {target_lang} 的翻译，参考专家建议和建设性批评。
+    prompt = f"""您的任务是仔细阅读并编辑从 {source_lang} 到 {target_lang} 的字幕翻译，参考专家建议和建设性批评。
 
-    源文本、初次翻译和专家建议如下，以 XML 标签 <SOURCE_TEXT></SOURCE_TEXT>、<TRANSLATION></TRANSLATION> 和 <EXPERT_SUGGESTIONS></EXPERT_SUGGESTIONS> 分隔：
+    源字幕文本、初次翻译和专家建议如下，以 XML 标签 <SOURCE_TEXT></SOURCE_TEXT>、<TRANSLATION></TRANSLATION> 和 <EXPERT_SUGGESTIONS></EXPERT_SUGGESTIONS> 分隔：
 
     <SOURCE_TEXT>
     {source_text}
@@ -225,7 +206,7 @@ def one_chunk_improve_translation(
 
     (i) 准确性（通过纠正添加、误译、遗漏或未翻译的错误），
     (ii) 流畅性（通过应用 {target_lang} 语法、拼写和标点符号规则，确保没有不必要的重复），
-    (iii) 风格（确保翻译反映源文本的风格），
+    (iii) 风格（确保翻译反映源字幕文本的风格），
     (iv) 术语（上下文不合适、不一致的使用），
     (v) 其他错误。
 
@@ -299,28 +280,28 @@ def multichunk_initial_translation(
         source_lang: str, target_lang: str, source_text_chunks: List[str]
 ) -> List[str]:
     """
-    将多段文本从源语言翻译为目标语言。
+    将多段字幕文本从源语言翻译为目标语言。
 
     参数:
-        source_lang (str): 文本的源语言。
+        source_lang (str): 字幕文本的源语言。
         target_lang (str): 翻译的目标语言。
-        source_text_chunks (List[str]): 需要翻译的文本段列表。
+        source_text_chunks (List[str]): 需要翻译的字幕文本段列表。
 
     返回:
-        List[str]: 翻译后的文本段列表。
+        List[str]: 翻译后的字幕文本段列表。
     """
 
-    system_message = f"你是一位语言学专家，专门从事将 {source_lang} 翻译成 {target_lang} 的工作。"
+    system_message = f"你是一位语言学专家，专门从事将 {source_lang} 字幕翻译成 {target_lang} 的工作。"
 
-    translation_prompt = """你的任务是将部分文本从 {source_lang} 专业翻译为 {target_lang}。
+    translation_prompt = """你的任务是将部分字幕文本从 {source_lang} 专业翻译为 {target_lang}。
 
-源文本如下，由 XML 标签 <SOURCE_TEXT> 和 </SOURCE_TEXT> 分隔。仅翻译源文本中由 <TRANSLATE_THIS> 和 </TRANSLATE_THIS> 分隔的部分。你可以使用其余的源文本作为上下文，但不要翻译任何其他文本。仅输出所需翻译部分的翻译结果。
+源字幕文本如下，由 XML 标签 <SOURCE_TEXT> 和 </SOURCE_TEXT> 分隔。仅翻译源字幕文本中由 <TRANSLATE_THIS> 和 </TRANSLATE_THIS> 分隔的部分。你可以使用其余的源字幕文本作为上下文，但不要翻译任何其他文本。仅输出所需翻译部分的翻译结果。
 
 <SOURCE_TEXT>
 {tagged_text}
 </SOURCE_TEXT>
 
-再次强调，你只需翻译此部分文本，再次展示在 <TRANSLATE_THIS> 和 </TRANSLATE_THIS> 之间的内容：
+再次强调，你只需翻译此部分字幕文本，再次展示在 <TRANSLATE_THIS> 和 </TRANSLATE_THIS> 之间的内容：
 <TRANSLATE_THIS>
 {chunk_to_translate}
 </TRANSLATE_THIS>
@@ -360,31 +341,31 @@ def multichunk_reflect_on_translation(
         country: str = "",
 ) -> List[str]:
     """
-    提供建设性的批评和改进部分翻译的建议。
+    提供建设性的批评和改进部分字幕翻译的建议。
 
     参数:
-        source_lang (str): 文本的源语言。
+        source_lang (str): 字幕文本的源语言。
         target_lang (str): 翻译的目标语言。
-        source_text_chunks (List[str]): 被分成块的源文本。
-        translation_1_chunks (List[str]): 对应源文本块的翻译块。
+        source_text_chunks (List[str]): 被分成块的源字幕文本。
+        translation_1_chunks (List[str]): 对应源字幕文本块的翻译块。
         country (str): 指定目标语言的国家。
 
     返回:
         List[str]: 反思的列表，包含对每个翻译块的改进建议。
     """
 
-    system_message = f"你是一位语言学专家，专门从事将 {source_lang} 翻译成 {target_lang} 的工作。你将获得一段源文本及其翻译，你的目标是改进该翻译。"
+    system_message = f"你是一位语言学专家，专门从事将 {source_lang} 翻译成 {target_lang} 的字幕翻译工作。你将获得一段源字幕文本及其翻译，你的目标是改进该翻译。"
 
     if country != "":
-        reflection_prompt = """你的任务是仔细阅读一段从 {source_lang} 翻译成 {target_lang} 的源文本及其部分翻译，然后提供建设性的批评和有用的建议，以改进翻译。最终的翻译风格和语气应与在 {country} 日常口语中的 {target_lang} 风格相匹配。
+        reflection_prompt = """你的任务是仔细阅读一段从 {source_lang} 翻译成 {target_lang} 的源字幕文本及其部分翻译，然后提供建设性的批评和有用的建议，以改进翻译。最终的翻译风格和语气应与在 {country} 日常口语中的 {target_lang} 风格相匹配。
 
-源文本如下，由 XML 标签 <SOURCE_TEXT> 和 </SOURCE_TEXT> 分隔，已翻译的部分在源文本中由 <TRANSLATE_THIS> 和 </TRANSLATE_THIS> 分隔。你可以使用其余的源文本作为评价翻译部分的上下文。
+源字幕文本如下，由 XML 标签 <SOURCE_TEXT> 和 </SOURCE_TEXT> 分隔，已翻译的部分在源字幕文本中由 <TRANSLATE_THIS> 和 </TRANSLATE_THIS> 分隔。你可以使用其余的源字幕文本作为评价翻译部分的上下文。
 
 <SOURCE_TEXT>
 {tagged_text}
 </SOURCE_TEXT>
 
-再次强调，仅翻译了部分文本，再次展示在 <TRANSLATE_THIS> 和 </TRANSLATE_THIS> 之间的内容：
+再次强调，仅翻译了部分字幕文本，再次展示在 <TRANSLATE_THIS> 和 </TRANSLATE_THIS> 之间的内容：
 <TRANSLATE_THIS>
 {chunk_to_translate}
 </TRANSLATE_THIS>
@@ -397,21 +378,21 @@ def multichunk_reflect_on_translation(
 在撰写建议时，请注意是否有改进翻译的方式：
 (i) 准确性（通过纠正添加、误译、遗漏或未翻译的文本错误），
 (ii) 流利度（通过应用 {target_lang} 语法、拼写和标点规则，并确保没有不必要的重复），
-(iii) 风格（通过确保翻译反映源文本的风格，并考虑任何文化背景），
-(iv) 术语（通过确保术语使用一致并反映源文本领域；并确保仅使用相当于 {target_lang} 的等效成语）。
+(iii) 风格（通过确保翻译反映源字幕文本的风格，并考虑任何文化背景），
+(iv) 术语（通过确保术语使用一致并反映源字幕文本领域；并确保仅使用相当于 {target_lang} 的等效成语）。
 
 写下具体、有帮助和建设性的改进翻译的建议列表。每条建议应针对翻译的一个具体部分。仅输出建议内容，除此之外不输出任何内容。"""
 
     else:
-        reflection_prompt = """你的任务是仔细阅读一段从 {source_lang} 翻译成 {target_lang} 的源文本及其部分翻译，然后提供建设性的批评和有用的建议，以改进翻译。
+        reflection_prompt = """你的任务是仔细阅读一段从 {source_lang} 翻译成 {target_lang} 的源字幕文本及其部分翻译，然后提供建设性的批评和有用的建议，以改进翻译。
 
-源文本如下，由 XML 标签 <SOURCE_TEXT> 和 </SOURCE_TEXT> 分隔，已翻译的部分在源文本中由 <TRANSLATE_THIS> 和 </TRANSLATE_THIS> 分隔。你可以使用其余的源文本作为评价翻译部分的上下文。
+源字幕文本如下，由 XML 标签 <SOURCE_TEXT> 和 </SOURCE_TEXT> 分隔，已翻译的部分在源字幕文本中由 <TRANSLATE_THIS> 和 </TRANSLATE_THIS> 分隔。你可以使用其余的源字幕文本作为评价翻译部分的上下文。
 
 <SOURCE_TEXT>
 {tagged_text}
 </SOURCE_TEXT>
 
-再次强调，仅翻译了部分文本，再次展示在 <TRANSLATE_THIS> 和 </TRANSLATE_THIS> 之间的内容：
+再次强调，仅翻译了部分字幕文本，再次展示在 <TRANSLATE_THIS> 和 </TRANSLATE_THIS> 之间的内容：
 <TRANSLATE_THIS>
 {chunk_to_translate}
 </TRANSLATE_THIS>
@@ -424,8 +405,8 @@ def multichunk_reflect_on_translation(
 在撰写建议时，请注意是否有改进翻译的方式：
 (i) 准确性（通过纠正添加、误译、遗漏或未翻译的文本错误），
 (ii) 流利度（通过应用 {target_lang} 语法、拼写和标点规则，并确保没有不必要的重复），
-(iii) 风格（通过确保翻译反映源文本的风格，并考虑任何文化背景），
-(iv) 术语（通过确保术语使用一致并反映源文本领域；并确保仅使用相当于 {target_lang} 的等效成语）。
+(iii) 风格（通过确保翻译反映源字幕文本的风格，并考虑任何文化背景），
+(iv) 术语（通过确保术语使用一致并反映源字幕文本领域；并确保仅使用相当于 {target_lang} 的等效成语）。
 
 写下具体、有帮助和建设性的改进翻译的建议列表。每条建议应针对翻译的一个具体部分。仅输出建议内容，除此之外不输出任何内容。"""
 
@@ -471,28 +452,28 @@ def multichunk_improve_translation(
         reflection_chunks: List[str],
 ) -> List[str]:
     """
-    改进从源语言到目标语言的文本翻译，参考专家建议。
+    改进从源语言到目标语言的字幕文本翻译，参考专家建议。
     参数:
-        source_lang (str): 文本的源语言。
+        source_lang (str): 字幕文本的源语言。
         target_lang (str): 翻译的目标语言。
-        source_text_chunks (List[str]): 分块后的源文本。
+        source_text_chunks (List[str]): 分块后的源字幕文本。
         translation_1_chunks (List[str]): 每个块的初始翻译。
         reflection_chunks (List[str]): 专家对每个翻译块的改进建议。
     返回:
         List[str]: 改进后的每个翻译块。
     """
 
-    system_message = f"您是一位语言学专家，专门从事从 {source_lang} 到 {target_lang} 的翻译编辑工作。"
+    system_message = f"您是一位语言学专家，专门从事从 {source_lang} 到 {target_lang} 的字幕翻译编辑工作。"
 
-    improvement_prompt = """您的任务是仔细阅读并改进从 {source_lang} 到 {target_lang} 的翻译，考虑一组专家建议和建设性批评。以下提供了源文本、初始翻译和专家建议。
+    improvement_prompt = """您的任务是仔细阅读并改进从 {source_lang} 到 {target_lang} 的字幕翻译，考虑一组专家建议和建设性批评。以下提供了源字幕文本、初始翻译和专家建议。
 
-源文本如下，由XML标签 <SOURCE_TEXT> 和 </SOURCE_TEXT> 分隔，要翻译的部分在源文本中的 <TRANSLATE_THIS> 和 </TRANSLATE_THIS> 之间。您可以将源文本的其余部分用作上下文，但只需翻译 <TRANSLATE_THIS> 和 </TRANSLATE_THIS> 之间的部分。
+源字幕文本如下，由XML标签 <SOURCE_TEXT> 和 </SOURCE_TEXT> 分隔，要翻译的部分在源字幕文本中的 <TRANSLATE_THIS> 和 </TRANSLATE_THIS> 之间。您可以将源字幕文本的其余部分用作上下文，但只需翻译 <TRANSLATE_THIS> 和 </TRANSLATE_THIS> 之间的部分。
 
 <SOURCE_TEXT>
 {tagged_text}
 </SOURCE_TEXT>
 
-再次重申，只翻译部分文本，再次显示在 <TRANSLATE_THIS> 和 </TRANSLATE_THIS> 之间：
+再次重申，只翻译部分字幕文本，再次显示在 <TRANSLATE_THIS> 和 </TRANSLATE_THIS> 之间：
 <TRANSLATE_THIS>
 {chunk_to_translate}
 </TRANSLATE_THIS>
@@ -511,7 +492,7 @@ def multichunk_improve_translation(
 
 (i) 准确性（通过纠正添加、误译、省略或未翻译的错误），
 (ii) 流畅性（应用 {target_lang} 语法、拼写和标点规则，并确保没有不必要的重复），
-(iii) 风格（确保翻译反映源文本的风格），
+(iii) 风格（确保翻译反映源字幕文本的风格），
 (iv) 术语（不适合上下文、不一致的使用），或
 (v) 其他错误。
 
